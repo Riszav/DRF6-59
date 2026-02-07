@@ -18,6 +18,7 @@ from .serializers import (
     ReviewValidateSerializer
 )
 from common.permissions import IsOwner, IsAnonymous, CanEditWithIn15Minutes
+from django.core.cache import cache
 
 
 PAGE_SIZE = 5
@@ -93,6 +94,17 @@ class ProductListCreateAPIView(ListCreateAPIView):
 
         return Response(data=ProductSerializer(product).data,
                         status=status.HTTP_201_CREATED)
+
+    def get(self, request, *args, **kwargs):
+        cached_data = cache.get("list_of_product")
+        if cached_data:
+            print("loaded from Redis")
+            return Response(data=cached_data, status=status.HTTP_200_OK)
+        print("loaded from Postgres")
+        response = super().get(self, request, *args, **kwargs)
+        if response.data.get("total", 0) > 0:
+            cache.set("list_of_product", response.data, timeout=300)
+        return response
 
 
 class ProductDetailAPIView(RetrieveUpdateDestroyAPIView):
