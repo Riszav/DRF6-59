@@ -18,6 +18,8 @@ import random
 import string
 from users.models import CustomUser
 from rest_framework_simplejwt.views import TokenObtainPairView
+from users.tasks import add, send_otp
+from time import sleep
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -25,12 +27,14 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
 class AuthorizationAPIView(CreateAPIView):
     serializer_class = AuthValidateSerializer
-    
+
     def post(self, request):
         serializer = AuthValidateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         user = authenticate(**serializer.validated_data)
+        add.delay(2,5)
+        # sleep(15)
 
         if user:
             if not user.is_active:
@@ -73,6 +77,7 @@ class RegistrationAPIView(CreateAPIView):
                 user=user,
                 code=code
             )
+            send_otp.delay(email, code)
 
         return Response(
             status=status.HTTP_201_CREATED,
@@ -85,7 +90,7 @@ class RegistrationAPIView(CreateAPIView):
 
 class ConfirmUserAPIView(CreateAPIView):
     serializer_class = ConfirmationSerializer
-    
+
     def post(self, request):
         serializer = ConfirmationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
